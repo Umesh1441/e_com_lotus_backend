@@ -8,22 +8,42 @@ const router = express.Router();
 router.post('/add', async (req, res) => {
     const { productId, quantity } = req.body;
     try {
-        const cartItem = new Cart({ productId, quantity });
-        await cartItem.save();
-        res.status(201).json(cartItem);
+        const existingCartItem = await Cart.findOne({ productId });
+
+    if (existingCartItem) {
+      existingCartItem.quantity += quantity;
+      await existingCartItem.save();
+      res.status(200).json(existingCartItem);
+    } else {
+      const cartItem = new Cart({ productId, quantity });
+      await cartItem.save();
+      res.status(201).json(cartItem);
+    }
     } catch (err) {
         res.status(400).json({ message: err.message });
     }
 });
 
 // Remove product from cart
-router.delete('/remove/:id', async (req, res) => {
-    try {
-        await Cart.findByIdAndDelete(req.params.id);
-        res.json({ message: 'Product removed from cart' });
-    } catch (err) {
-        res.status(500).json({ message: err.message });
+router.delete("/remove/:id", async (req, res) => {
+  try {
+    const cartItem = await Cart.findById(req.params.id);
+
+    if (!cartItem) {
+      return res.status(404).json({ message: "Product not found in cart" });
     }
+
+    if (cartItem.quantity > 1) {
+      cartItem.quantity -= 1;
+      await cartItem.save();
+      res.json({ message: "Product quantity reduced", cartItem });
+    } else {
+      await Cart.findByIdAndDelete(req.params.id);
+      res.json({ message: "Product removed from cart" });
+    }
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 });
 
 // Get cart details
